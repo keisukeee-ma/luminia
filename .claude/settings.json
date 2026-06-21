@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Supabase__list_projects"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\yykkm\\Desktop\\PJ\\brain"
+    ]
+  }
+}
