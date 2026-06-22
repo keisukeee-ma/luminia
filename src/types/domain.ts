@@ -1,0 +1,41 @@
+export type Ability = "Gs" | "Gsm" | "Gf" | "Gv" | "Glr" | "Gc";
+
+export const ABILITY_LABEL: Record<Ability, string> = {
+  Gs: "処理速度",
+  Gsm: "作業記憶",
+  Gf: "流動性推論",
+  Gv: "視覚処理",
+  Glr: "記憶",
+  Gc: "結晶性知能",
+};
+
+/** 加齢で低下する流動系（脳年齢推定の主軸）。Gc は対照アンカーなので含めない。 */
+export const FLUID_ABILITIES: Ability[] = ["Gs", "Gsm", "Gf", "Gv", "Glr"];
+
+export type Sex = "male" | "female" | "other" | "na";
+
+export const SEX_LABEL: Record<Sex, string> = {
+  male: "男性",
+  female: "女性",
+  other: "その他",
+  na: "回答しない",
+};
+
+export const AGE_BANDS = [
+  "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44",
+  "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+",
+] as const;
+
+export type AgeBand = (typeof AGE_BANDS)[number];
+
+/** 年齢帯の代表年齢（脳年齢回帰・規準補間に使う中央値）。 */
+export const AGE_BAND_MID: Record<AgeBand, number> = {
+  "10-14": 12, "15-19": 17, "20-24": 22, "25-29": 27, "30-34": 32,
+  "35-39": 37, "40-44": 42, "45-49": 47, "50-54": 52, "55-59": 57,
+  "60-64": 62, "65-69": 67, "70-74": 72, "75-79": 77, "80+": 82,
+};
+
+export interface Profile {
+  age_band: AgeBand;
+  sex: Sex;
+}

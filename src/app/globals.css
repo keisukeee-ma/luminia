@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #EDEADE;
+  --paper: #E8E3D6;
+  --border: #D5CFC2;
+  --brass: #A8843C;
+  --ink: #1C2B38;
+  --muted: #4A5A6A;
+  --blue: #4A6E8A;
+  --green: #4D7A60;
+  --red: #8C3A3A;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-bg: var(--bg);
+  --color-paper: var(--paper);
+  --color-border: var(--border);
+  --color-brass: var(--brass);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-red: var(--red);
+  --font-noto: var(--font-noto);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-noto), "Noto Sans JP", sans-serif;
+  font-size: 16px;
 }
+
+.font-display { font-family: var(--font-noto), sans-serif; font-weight: 400; }
+.font-body { font-family: var(--font-noto), sans-serif; font-weight: 500; }
+.font-data { font-family: var(--font-noto), sans-serif; font-weight: 700; }
