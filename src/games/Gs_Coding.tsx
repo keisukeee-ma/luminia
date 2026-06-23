@@ -57,6 +57,17 @@ export default function Gs_Coding({
     }
   }, [started, remaining, onComplete]);
 
+  // キーボード入力（数字キー1-9）
+  useEffect(() => {
+    if (!started) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key >= "1" && e.key <= "9") press(Number(e.key));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, symbol, key]);
+
   const press = (digit: number) => {
     if (!key || doneRef.current) return;
     const correct = key[symbol] === digit;
@@ -87,7 +98,13 @@ export default function Gs_Coding({
             をできるだけ速く押してください。制限時間は30秒です。
           </>
         }
-        example={<p className="text-muted text-sm">例: ○ が 1 のとき、○ を見たら「1」を押す</p>}
+        example={
+          <p className="text-muted text-base">
+            例: ○ が 1 のとき、○ を見たら「1」を押す
+            <br />
+            （マウスでもキーボードの数字でも入力できます）
+          </p>
+        }
         onStart={start}
       />
     );

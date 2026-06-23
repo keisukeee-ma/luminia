@@ -12,14 +12,28 @@ export const ABILITY_LABEL: Record<Ability, string> = {
 /** 加齢で低下する流動系（脳年齢推定の主軸）。Gc は対照アンカーなので含めない。 */
 export const FLUID_ABILITIES: Ability[] = ["Gs", "Gsm", "Gf", "Gv", "Glr"];
 
-export type Sex = "male" | "female" | "other" | "na";
+export type Sex = "male" | "female" | "other";
 
 export const SEX_LABEL: Record<Sex, string> = {
   male: "男性",
   female: "女性",
   other: "その他",
-  na: "回答しない",
 };
+
+/** 職業カテゴリ（計測前に取得）。 */
+export const OCCUPATIONS = [
+  "会社員",
+  "公務員",
+  "自営業・経営者",
+  "専門職（医療・士業など）",
+  "学生",
+  "パート・アルバイト",
+  "主婦・主夫",
+  "無職",
+  "その他",
+] as const;
+
+export type Occupation = (typeof OCCUPATIONS)[number];
 
 export const AGE_BANDS = [
   "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44",
@@ -38,4 +52,6 @@ export const AGE_BAND_MID: Record<AgeBand, number> = {
 export interface Profile {
   age_band: AgeBand;
   sex: Sex;
+  occupation?: Occupation;
+  postal_code?: string;
 }

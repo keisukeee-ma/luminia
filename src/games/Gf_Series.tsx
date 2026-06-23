@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReadyScreen from "@/components/ReadyScreen";
 import Feedback from "@/components/Feedback";
 import { mulberry32 } from "@/lib/rng";
@@ -34,6 +34,18 @@ export default function Gf_Series({
     setStarted(true);
     loadItem(0);
   };
+
+  // キーボード入力（1〜4で選択肢を選ぶ）
+  useEffect(() => {
+    if (!started || !item) return;
+    const onKey = (e: KeyboardEvent) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= item.options.length) choose(item.options[n - 1]);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, item, locked]);
 
   const choose = (opt: number) => {
     if (!item || locked || doneRef.current) return;
@@ -75,7 +87,13 @@ export default function Gf_Series({
             下の4つから選んでください。全6問です。
           </>
         }
-        example={<p className="text-muted text-sm">例: 2 4 6 8 ? → 10</p>}
+        example={
+          <p className="text-muted text-base">
+            例: 2 4 6 8 ? → 10
+            <br />
+            （ボタン、またはキーボードの 1〜4 で選べます）
+          </p>
+        }
         onStart={start}
       />
     );
@@ -93,13 +111,16 @@ export default function Gf_Series({
           <span className="text-brass">?</span>
         </div>
         <div className="mt-10 grid grid-cols-2 gap-3">
-          {item.options.map((o) => (
+          {item.options.map((o, i) => (
             <button
               key={o}
               onClick={() => choose(o)}
               disabled={locked}
-              className="py-4 rounded-lg border border-border bg-paper font-data text-2xl text-ink tabular-nums disabled:opacity-60"
+              className="relative py-5 rounded-lg border border-border bg-paper font-data text-3xl text-ink tabular-nums disabled:opacity-60"
             >
+              <span className="absolute left-3 top-2 text-base text-muted font-body">
+                {i + 1}
+              </span>
               {o}
             </button>
           ))}

@@ -148,8 +148,10 @@ export default function Gsm_DigitSpan({
           )
         }
         example={
-          <p className="text-muted text-sm">
+          <p className="text-muted text-base">
             {mode === "backward" ? "例: 5 1 8 → 「8 1 5」と入力" : "例: 4 8 2 → 「4 8 2」と入力"}
+            <br />
+            （ボタン、またはキーボードの数字でも入力できます）
           </p>
         }
         onStart={start}
@@ -163,7 +165,7 @@ export default function Gsm_DigitSpan({
 
       {phase === "show" && (
         <div className="flex flex-col items-center">
-          <p className="text-sm text-muted mb-6">覚えてください</p>
+          <p className="text-lg text-muted mb-6">覚えてください</p>
           <div className="font-data text-ink" style={{ fontSize: 96, lineHeight: 1, minHeight: 100 }}>
             {showIdx >= 0 ? seq[showIdx] : ""}
           </div>
@@ -172,7 +174,7 @@ export default function Gsm_DigitSpan({
 
       {phase === "recall" && (
         <div className="flex flex-col items-center w-full max-w-xs">
-          <p className="text-sm text-muted mb-4">
+          <p className="text-lg text-muted mb-4">
             {mode === "backward" ? "逆の順番で入力" : "順番に入力"}
           </p>
           <div className="h-10 mb-6 flex items-center gap-2 font-data text-2xl text-ink tabular-nums">

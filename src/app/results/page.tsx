@@ -36,7 +36,7 @@ export default function ResultsPage() {
     <div className="flex-1">
       <ResultsView scores={scores} />
       <div className="text-center pb-12">
-        <Link href="/" className="text-sm text-brass underline">
+        <Link href="/" className="text-base text-brass underline">
           ホームに戻る
         </Link>
       </div>

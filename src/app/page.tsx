@@ -16,7 +16,7 @@ export default function Home() {
       >
         計測をはじめる
       </Link>
-      <p className="mt-6 text-xs text-muted">
+      <p className="mt-6 text-base text-muted">
         ※ 現在は縦切り版（3能力・約2分）です。
       </p>
     </div>
