@@ -13,7 +13,8 @@ export default function AbilityMeter({
   delay?: number;
 }) {
   const t = score.t_age;
-  const targetPct = Math.max(0, Math.min(100, ((t - 20) / 60) * 100));
+  // 偏差値そのもの（0〜100, 平均50が中央）を目盛りにして、その値の位置まで色を伸ばす
+  const targetPct = Math.max(0, Math.min(100, t));
   const [pct, setPct] = useState(0);
   const [shownT, setShownT] = useState(0);
   const rafRef = useRef(0);
