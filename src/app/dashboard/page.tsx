@@ -4,16 +4,32 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadHistory } from "@/lib/history";
 import { ABILITY_LABEL } from "@/types/domain";
+import { fetchAgeBandDistribution, type AgeBandDist } from "@/lib/compare";
 import DistributionMeter from "@/components/DistributionMeter";
+import PopulationHistogram from "@/components/PopulationHistogram";
 import type { ComputedScores } from "@/types/scoring";
+
+const MIN_N = 20; // 実データ比較に必要な最低人数（下回れば理論カーブにフォールバック）
 
 export default function DashboardPage() {
   const [scores, setScores] = useState<ComputedScores | null | undefined>(undefined);
+  const [ageBand, setAgeBand] = useState<string | null>(null);
+  const [dist, setDist] = useState<AgeBandDist | null>(null);
+  const [loadingDist, setLoadingDist] = useState(false);
 
   useEffect(() => {
     const h = loadHistory();
     setScores(h[0]?.scores ?? null);
+    setAgeBand(h[0]?.profile?.age_band ?? null);
   }, []);
+
+  useEffect(() => {
+    if (!ageBand) return;
+    setLoadingDist(true);
+    fetchAgeBandDistribution(ageBand)
+      .then(setDist)
+      .finally(() => setLoadingDist(false));
+  }, [ageBand]);
 
   if (scores === undefined) return null;
 
@@ -21,9 +37,7 @@ export default function DashboardPage() {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="font-data text-2xl text-ink">みんなとの比較</h1>
-        <p className="mt-4 text-base text-muted">
-          比較するには、まず計測してください。
-        </p>
+        <p className="mt-4 text-base text-muted">比較するには、まず計測してください。</p>
         <Link
           href="/setup"
           className="inline-block mt-6 bg-brass text-white rounded-md px-8 py-3 font-body"
@@ -35,13 +49,17 @@ export default function DashboardPage() {
   }
 
   const brainAge = scores.result.brain_age;
+  // 母集団人数（能力ごとに total は揃うので最大値を代表値に）
+  const popN = dist ? Math.max(0, ...Object.values(dist).map((d) => d?.total ?? 0)) : 0;
+  const hasReal = popN >= MIN_N;
 
   return (
     <div className="mx-auto max-w-xl w-full px-4 py-10">
       <h1 className="font-data text-2xl text-ink">みんなとの比較</h1>
       <p className="mt-2 text-base text-muted leading-relaxed">
-        あなたの最新の結果を、標準的な分布（平均50・偏差値）の中で見た位置です。
-        山の真ん中が平均、ゴールドの線があなたです。
+        {hasReal
+          ? `同年代（${ageBand}）${popN}人の中での、あなたの位置です。山が高いところに人が多く、ゴールドの線があなたです。`
+          : "あなたの結果を、標準的な分布（平均50・偏差値）の中で見た位置です。山の真ん中が平均、ゴールドの線があなたです。"}
       </p>
 
       {brainAge !== null && (
@@ -54,14 +72,47 @@ export default function DashboardPage() {
       )}
 
       <div className="mt-6 bg-paper border border-border rounded-lg px-5 py-3">
-        {scores.abilities.map((a) => (
-          <DistributionMeter key={a.ability} label={ABILITY_LABEL[a.ability]} t={a.t_age} />
-        ))}
+        {loadingDist && (
+          <p className="py-4 text-base text-muted text-center">分布を読み込み中…</p>
+        )}
+        {!loadingDist &&
+          scores.abilities.map((a) => {
+            if (a.notMeasured) {
+              return (
+                <div key={a.ability} className="py-3 flex items-baseline justify-between">
+                  <span className="font-body text-base text-ink">
+                    {ABILITY_LABEL[a.ability]}
+                  </span>
+                  <span className="text-base text-muted">測定不能</span>
+                </div>
+              );
+            }
+            const d = dist?.[a.ability];
+            if (hasReal && d && d.total >= MIN_N) {
+              return (
+                <PopulationHistogram
+                  key={a.ability}
+                  label={ABILITY_LABEL[a.ability]}
+                  userT={a.t_age}
+                  buckets={d.buckets}
+                  total={d.total}
+                />
+              );
+            }
+            return (
+              <DistributionMeter
+                key={a.ability}
+                label={ABILITY_LABEL[a.ability]}
+                t={a.t_age}
+              />
+            );
+          })}
       </div>
 
       <p className="mt-6 text-base leading-relaxed text-muted">
-        ※ 現在は文献ベースの暫定規準（v0）との比較です。実際のユーザー同士の比較は、
-        データが集まり次第（サーバー連携で）対応します。
+        {hasReal
+          ? "※ 棒グラフは同年代の実際の参加者の分布です。参加者が増えるほど、より実態に近い比較になります。"
+          : "※ まだ同年代のデータが少ないため、文献ベースの暫定規準（v0）との比較を表示しています。"}
       </p>
     </div>
   );
