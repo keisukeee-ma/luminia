@@ -10,7 +10,10 @@ function buildShareText(scores: ComputedScores): string {
   const deltaStr =
     delta !== null ? `（実年齢より${delta > 0 ? "+" : ""}${delta}歳）` : "";
 
-  const lines = [`脳年齢：${age !== null ? age + "歳" : "測定不能"}${deltaStr}`, ""];
+  const lines = [
+    `脳年齢：${age !== null ? age + "歳" : "測定不能"}${deltaStr}`,
+    "",
+  ];
 
   for (const a of scores.abilities) {
     if (a.notMeasured) {
@@ -20,6 +23,7 @@ function buildShareText(scores: ComputedScores): string {
     }
   }
 
+  lines.push("", "https://brain-three-gamma.vercel.app");
   return lines.join("\n");
 }
 
