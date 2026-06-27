@@ -7,10 +7,19 @@ interface Props {
   description: ReactNode;
   example?: ReactNode;
   onStart: () => void;
+  onPractice?: () => void;
+  startLabel?: string;
 }
 
-/** ゲーム開始前の準備画面（タイトル・説明・例示・始める）。 */
-export default function ReadyScreen({ title, description, example, onStart }: Props) {
+/** ゲーム開始前の準備画面（タイトル・説明・例示・始める／任意で「試しに1問」）。 */
+export default function ReadyScreen({
+  title,
+  description,
+  example,
+  onStart,
+  onPractice,
+  startLabel = "始める",
+}: Props) {
   return (
     <div className="flex-1 flex items-center justify-center px-4">
       <div className="max-w-md w-full text-center">
@@ -21,12 +30,22 @@ export default function ReadyScreen({ title, description, example, onStart }: Pr
             {example}
           </div>
         )}
-        <button
-          onClick={onStart}
-          className="mt-8 bg-brass text-white rounded-md px-10 py-3.5 text-lg font-body"
-        >
-          始める
-        </button>
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <button
+            onClick={onStart}
+            className="bg-brass text-white rounded-md px-10 py-3.5 text-lg font-body"
+          >
+            {startLabel}
+          </button>
+          {onPractice && (
+            <button
+              onClick={onPractice}
+              className="text-base text-brass underline"
+            >
+              試しに1問やってみる
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

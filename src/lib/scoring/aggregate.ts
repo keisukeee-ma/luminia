@@ -8,16 +8,21 @@ function median(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-function spanScore(trials: Trial[]): { maxSpan: number; partial: number } {
+function spanScore(trials: Trial[]): {
+  totalCorrect: number;
+  maxSpan: number;
+  nTrials: number;
+} {
+  let totalCorrect = 0;
   let maxSpan = 0;
-  let partial = 0;
   for (const t of trials) {
-    const span = t.difficulty ?? 0;
-    if (t.correct && span > maxSpan) maxSpan = span;
-    const p = (t.extra?.partial as number) ?? 0;
-    if (p > partial) partial = p;
+    if (t.correct) {
+      totalCorrect += 1;
+      const span = t.difficulty ?? 0;
+      if (span > maxSpan) maxSpan = span;
+    }
   }
-  return { maxSpan, partial };
+  return { totalCorrect, maxSpan, nTrials: trials.length };
 }
 
 /** 1課題分の trials を TaskScore に集計する。 */
@@ -45,16 +50,22 @@ export function aggregateTask(taskId: string, trials: Trial[]): TaskScore {
     }
     case "Gsm_digit_forward":
     case "Gsm_digit_backward": {
-      const { maxSpan, partial } = spanScore(trials);
+      const { totalCorrect, maxSpan, nTrials } = spanScore(trials);
       return {
         task_id: taskId,
         ability,
-        raw_score: maxSpan,
-        metrics: { max_span: maxSpan, partial },
+        raw_score: totalCorrect,
+        metrics: {
+          total_correct: totalCorrect,
+          max_span_reached: maxSpan,
+          n_trials: nTrials,
+        },
         completed,
       };
     }
-    case "Gf_series": {
+    case "Gf_series":
+    case "Gc_knowledge": {
+      // 難易度重み付き正答率
       let num = 0;
       let den = 0;
       for (const t of trials) {
@@ -73,6 +84,30 @@ export function aggregateTask(taskId: string, trials: Trial[]): TaskScore {
             ? trials.filter((t) => t.correct).length / trials.length
             : 0,
         },
+        completed,
+      };
+    }
+    case "Gv_rotation": {
+      const nCorrect = trials.filter((t) => t.correct).length;
+      const accuracy = trials.length ? nCorrect / trials.length : 0;
+      const rts = trials
+        .filter((t) => typeof t.rt_ms === "number")
+        .map((t) => t.rt_ms as number);
+      return {
+        task_id: taskId,
+        ability,
+        raw_score: accuracy,
+        metrics: { accuracy, rt_median: median(rts), n_trials: trials.length },
+        completed,
+      };
+    }
+    case "Glr_recognition": {
+      const nCorrect = trials.filter((t) => t.correct).length;
+      return {
+        task_id: taskId,
+        ability,
+        raw_score: nCorrect,
+        metrics: { total_correct: nCorrect, n_trials: trials.length },
         completed,
       };
     }

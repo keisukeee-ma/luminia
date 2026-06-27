@@ -1,9 +1,13 @@
 import { type RNG, randInt } from "@/lib/rng";
 
-export const SPAN_START = 3;
 export const DIGIT_SHOW_MS = 800;
 export const DIGIT_GAP_MS = 200;
-export const MAX_STRIKES = 2; // 2連続失敗で終了
+
+/** 固定長プラン: スパン3〜5を各2試行＝全員6試行（早期終了しない）。 */
+export const DIGIT_SPAN_PLAN = [3, 3, 4, 4, 5, 5];
+
+/** 同時提示の表示時間（ms）。系列が長いほど長く表示する。 */
+export const spanDisplayMs = (span: number): number => 1000 + 500 * span;
 
 export type SpanMode = "forward" | "backward";
 
@@ -41,6 +45,11 @@ export function expected(seq: number[], mode: SpanMode): number[] {
 
 export function arrEq(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/** 固定プランに沿って全試行分の系列を生成する（各要素が1試行）。 */
+export function buildSpanTrials(rng: RNG): number[][] {
+  return DIGIT_SPAN_PLAN.map((span) => genDigitSeq(rng, span));
 }
 
 /** 系列内の先頭から連続して正答した数（部分点）。 */

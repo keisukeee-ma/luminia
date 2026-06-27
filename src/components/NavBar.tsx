@@ -14,13 +14,19 @@ export default function NavBar() {
         <Link href="/" className="font-data text-base text-ink">
           脳年齢測定
         </Link>
-        <div className="flex items-center gap-4 text-base">
-          <Link href="/" className="text-muted hover:text-ink">
-            ホーム
+        <div className="flex items-center gap-3 text-base">
+          <Link href="/mypage" className="text-muted hover:text-ink">
+            マイページ
+          </Link>
+          <Link href="/dashboard" className="text-muted hover:text-ink">
+            比較
+          </Link>
+          <Link href="/about" className="text-muted hover:text-ink">
+            アプリについて
           </Link>
           <Link
             href="/setup"
-            className="text-base bg-brass text-white px-3 py-1.5 rounded-md"
+            className="bg-brass text-white px-3 py-1.5 rounded-md"
           >
             計測する
           </Link>

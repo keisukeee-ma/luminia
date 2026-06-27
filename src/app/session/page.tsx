@@ -8,6 +8,7 @@ import {
   clearSession,
   isFinished,
   STEPS,
+  GLR_SEED_OFFSET,
   type SessionState,
 } from "@/lib/session";
 import { stepSeed } from "@/lib/rng";
@@ -19,6 +20,10 @@ import GameShell from "@/components/GameShell";
 import Gs_Coding from "@/games/Gs_Coding";
 import Gsm_DigitSpan from "@/games/Gsm_DigitSpan";
 import Gf_Series from "@/games/Gf_Series";
+import Gv_Rotation from "@/games/Gv_Rotation";
+import Gc_Knowledge from "@/games/Gc_Knowledge";
+import Glr_WordLearn from "@/games/Glr_WordLearn";
+import Glr_WordRecall from "@/games/Glr_WordRecall";
 
 export default function SessionPage() {
   const router = useRouter();
@@ -64,6 +69,8 @@ export default function SessionPage() {
 
   const step = STEPS[session.stepIndex];
   const seed = stepSeed(session.seed, session.stepIndex);
+  // Glr 学習・再生は同じ学習語を共有するため固定オフセットの seed を使う
+  const glrSeed = stepSeed(session.seed, GLR_SEED_OFFSET);
 
   let game = null;
   switch (step.game) {
@@ -78,6 +85,18 @@ export default function SessionPage() {
       break;
     case "series":
       game = <Gf_Series key={step.task_id} seed={seed} onComplete={handleComplete} />;
+      break;
+    case "rotation":
+      game = <Gv_Rotation key={step.task_id} seed={seed} onComplete={handleComplete} />;
+      break;
+    case "knowledge":
+      game = <Gc_Knowledge key={step.task_id} seed={seed} onComplete={handleComplete} />;
+      break;
+    case "wordLearn":
+      game = <Glr_WordLearn key={step.task_id} seed={glrSeed} onComplete={handleComplete} />;
+      break;
+    case "wordRecall":
+      game = <Glr_WordRecall key={step.task_id} seed={glrSeed} onComplete={handleComplete} />;
       break;
   }
 

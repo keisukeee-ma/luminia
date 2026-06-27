@@ -3,21 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import ReadyScreen from "@/components/ReadyScreen";
 import Feedback from "@/components/Feedback";
+import { Bridge } from "@/games/Gf_Series";
 import { mulberry32 } from "@/lib/rng";
+import { createEventLog, deriveMetrics } from "@/lib/telemetry";
 import {
+  buildSpanTrials,
   genDigitSeq,
   expected,
   arrEq,
   longestCorrectPrefix,
-  SPAN_START,
-  DIGIT_SHOW_MS,
-  DIGIT_GAP_MS,
-  MAX_STRIKES,
+  spanDisplayMs,
   type SpanMode,
 } from "@/lib/generators/digitSpan";
 import type { Trial } from "@/types/scoring";
 
-type Phase = "ready" | "show" | "recall";
+type Phase = "ready" | "show" | "recall" | "between" | "bridge";
 
 export default function Gsm_DigitSpan({
   mode,
@@ -31,120 +31,133 @@ export default function Gsm_DigitSpan({
   const taskId = mode === "backward" ? "Gsm_digit_backward" : "Gsm_digit_forward";
 
   const [phase, setPhase] = useState<Phase>("ready");
-  const [seq, setSeq] = useState<number[]>([]);
-  const [showIdx, setShowIdx] = useState(-1);
+  const [visible, setVisible] = useState(false);
   const [input, setInput] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<boolean | null>(null);
+  const [trialIdx, setTrialIdx] = useState(0);
+  const [practicing, setPracticing] = useState(false);
 
-  const rngRef = useRef(mulberry32(seed));
+  const planRef = useRef<number[][]>([]);
+  const practiceSeqRef = useRef<number[]>([]);
   const trialsRef = useRef<Trial[]>([]);
   const ordinalRef = useRef(0);
-  const spanRef = useRef(SPAN_START);
-  const strikesRef = useRef(0);
+  const logRef = useRef(createEventLog());
   const doneRef = useRef(false);
 
-  const start = () => {
-    spanRef.current = SPAN_START;
-    strikesRef.current = 0;
-    ordinalRef.current = 0;
-    trialsRef.current = [];
-    doneRef.current = false;
-    setSeq(genDigitSeq(rngRef.current, SPAN_START));
+  const seq = practicing ? practiceSeqRef.current : planRef.current[trialIdx] ?? [];
+
+  const startPractice = () => {
+    practiceSeqRef.current = genDigitSeq(mulberry32((seed ^ 0x3131) >>> 0), 3);
+    setPracticing(true);
     setInput([]);
     setPhase("show");
   };
 
-  // 提示シーケンス
+  const startReal = () => {
+    planRef.current = buildSpanTrials(mulberry32(seed));
+    trialsRef.current = [];
+    ordinalRef.current = 0;
+    doneRef.current = false;
+    setPracticing(false);
+    setTrialIdx(0);
+    setInput([]);
+    setPhase("show");
+  };
+
+  // 提示（系列全体を数秒まとめて表示 → 非表示 → 再生）
   useEffect(() => {
     if (phase !== "show" || seq.length === 0) return;
-    let i = 0;
+    setVisible(true);
     const timers: number[] = [];
-    const step = () => {
-      if (i >= seq.length) {
-        setShowIdx(-1);
-        timers.push(window.setTimeout(() => setPhase("recall"), 250));
-        return;
-      }
-      setShowIdx(i);
-      timers.push(
-        window.setTimeout(() => {
-          setShowIdx(-1);
-          timers.push(
-            window.setTimeout(() => {
-              i++;
-              step();
-            }, DIGIT_GAP_MS),
-          );
-        }, DIGIT_SHOW_MS),
-      );
-    };
-    step();
+    timers.push(
+      window.setTimeout(() => {
+        setVisible(false);
+        timers.push(
+          window.setTimeout(() => {
+            logRef.current.reset();
+            setPhase("recall");
+          }, 350),
+        );
+      }, spanDisplayMs(seq.length)),
+    );
     return () => timers.forEach(clearTimeout);
   }, [phase, seq]);
 
   const submit = () => {
     if (phase !== "recall" || input.length === 0 || doneRef.current) return;
+    logRef.current.push("submit");
+    const span = seq.length;
     const target = expected(seq, mode);
     const correct = arrEq(input, target);
     const partial = longestCorrectPrefix(input, target);
+    const m = deriveMetrics(logRef.current.events);
+
+    if (practicing) {
+      setFeedback(correct);
+      setPhase("between");
+      window.setTimeout(() => {
+        setFeedback(null);
+        setInput([]);
+        setPhase("bridge");
+      }, 800);
+      return;
+    }
+
     trialsRef.current.push({
       task_id: taskId,
       ability: "Gsm",
       ordinal: ordinalRef.current++,
-      difficulty: spanRef.current,
+      difficulty: span,
       response: [...input],
       correct,
-      rt_ms: null,
-      extra: { span: spanRef.current, partial, mode },
+      rt_ms: m.time_to_first_ms,
+      extra: { span, partial, mode, events: [...logRef.current.events], ...m },
     });
-    if (correct) {
-      spanRef.current += 1;
-      strikesRef.current = 0;
-    } else {
-      strikesRef.current += 1;
-    }
-    setFeedback(correct);
-    setPhase("ready"); // 入力受付を止める一時状態
+    setPhase("between");
     window.setTimeout(() => {
-      setFeedback(null);
       setInput([]);
-      if (!correct && strikesRef.current >= MAX_STRIKES) {
+      const next = trialIdx + 1;
+      if (next >= planRef.current.length) {
         doneRef.current = true;
         onComplete(trialsRef.current);
         return;
       }
-      setSeq(genDigitSeq(rngRef.current, spanRef.current));
+      setTrialIdx(next);
       setPhase("show");
-    }, 600);
+    }, 300);
   };
 
-  // キーボード入力（数字・Backspace・Enter）
+  const pushDigit = (d: number) => {
+    logRef.current.push("key", d);
+    setInput((p) => [...p, d]);
+  };
+  const backspace = () => {
+    logRef.current.push("backspace");
+    setInput((p) => p.slice(0, -1));
+  };
+
+  // キーボード入力
   useEffect(() => {
     if (phase !== "recall") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key >= "0" && e.key <= "9") {
-        setInput((p) => [...p, Number(e.key)]);
-      } else if (e.key === "Backspace") {
-        setInput((p) => p.slice(0, -1));
-      } else if (e.key === "Enter") {
-        submit();
-      }
+      if (e.key >= "0" && e.key <= "9") pushDigit(Number(e.key));
+      else if (e.key === "Backspace") backspace();
+      else if (e.key === "Enter") submit();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // submit は input/seq に依存するため deps に含める
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, input, seq]);
 
-  if (phase === "ready" && seq.length === 0) {
+  if (phase === "ready") {
     return (
       <ReadyScreen
         title={mode === "backward" ? "逆唱" : "数唱"}
         description={
           mode === "backward" ? (
-            <>表示される数字を覚えて、見た順番の<span className="text-ink font-body">逆</span>から入力してください。正解すると桁数が増えます。</>
+            <>数字が数秒表示されます。覚えて、見た順番の<span className="text-ink font-body">逆</span>から入力してください。短いものから長いものまで全6問です。</>
           ) : (
-            <>表示される数字を覚えて、見た<span className="text-ink font-body">順番のまま</span>入力してください。正解すると桁数が増えます。</>
+            <>数字が数秒表示されます。覚えて、見た<span className="text-ink font-body">順番のまま</span>入力してください。短いものから長いものまで全6問です。</>
           )
         }
         example={
@@ -154,20 +167,28 @@ export default function Gsm_DigitSpan({
             （ボタン、またはキーボードの数字でも入力できます）
           </p>
         }
-        onStart={start}
+        onStart={startReal}
+        onPractice={startPractice}
       />
     );
   }
+  if (phase === "bridge") return <Bridge onStart={startReal} />;
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
-      <Feedback feedback={feedback} />
+      {practicing && <Feedback feedback={feedback} />}
+      {practicing && phase !== "between" && (
+        <p className="text-base text-muted mb-3">れんしゅう</p>
+      )}
 
       {phase === "show" && (
         <div className="flex flex-col items-center">
           <p className="text-lg text-muted mb-6">覚えてください</p>
-          <div className="font-data text-ink" style={{ fontSize: 96, lineHeight: 1, minHeight: 100 }}>
-            {showIdx >= 0 ? seq[showIdx] : ""}
+          <div
+            className="font-data text-ink tabular-nums flex items-center gap-3"
+            style={{ fontSize: 72, lineHeight: 1, minHeight: 100 }}
+          >
+            {visible ? seq.map((d, i) => <span key={i}>{d}</span>) : ""}
           </div>
         </div>
       )}
@@ -184,20 +205,20 @@ export default function Gsm_DigitSpan({
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
               <button
                 key={d}
-                onClick={() => setInput((p) => [...p, d])}
+                onClick={() => pushDigit(d)}
                 className="w-16 h-16 rounded-lg border border-border bg-paper text-2xl font-data text-ink"
               >
                 {d}
               </button>
             ))}
             <button
-              onClick={() => setInput((p) => p.slice(0, -1))}
+              onClick={backspace}
               className="w-16 h-16 rounded-lg border border-border bg-paper text-base text-muted"
             >
               ⌫
             </button>
             <button
-              onClick={() => setInput((p) => [...p, 0])}
+              onClick={() => pushDigit(0)}
               className="w-16 h-16 rounded-lg border border-border bg-paper text-2xl font-data text-ink"
             >
               0

@@ -35,6 +35,37 @@ export const OCCUPATIONS = [
 
 export type Occupation = (typeof OCCUPATIONS)[number];
 
+/** 業種（計測前に取得）。 */
+export const INDUSTRIES = [
+  "IT・通信",
+  "製造",
+  "医療・福祉",
+  "教育",
+  "金融・保険",
+  "建設・不動産",
+  "流通・小売",
+  "公務",
+  "サービス",
+  "その他",
+] as const;
+
+export type Industry = (typeof INDUSTRIES)[number];
+
+/** 職種（計測前に取得）。 */
+export const JOB_TYPES = [
+  "営業",
+  "企画・マーケティング",
+  "事務・管理",
+  "技術・研究",
+  "専門職",
+  "製造・現場",
+  "販売・接客",
+  "クリエイティブ",
+  "その他",
+] as const;
+
+export type JobType = (typeof JOB_TYPES)[number];
+
 export const AGE_BANDS = [
   "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44",
   "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80+",
@@ -53,5 +84,7 @@ export interface Profile {
   age_band: AgeBand;
   sex: Sex;
   occupation?: Occupation;
+  industry?: Industry;
+  job_type?: JobType;
   postal_code?: string;
 }

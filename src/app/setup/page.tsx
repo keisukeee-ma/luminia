@@ -6,9 +6,13 @@ import {
   AGE_BANDS,
   SEX_LABEL,
   OCCUPATIONS,
+  INDUSTRIES,
+  JOB_TYPES,
   type AgeBand,
   type Sex,
   type Occupation,
+  type Industry,
+  type JobType,
 } from "@/types/domain";
 import { createSession, saveSession } from "@/lib/session";
 
@@ -19,11 +23,19 @@ export default function SetupPage() {
   const [age, setAge] = useState<AgeBand | "">("");
   const [sex, setSex] = useState<Sex | "">("");
   const [occupation, setOccupation] = useState<Occupation | "">("");
+  const [industry, setIndustry] = useState<Industry | "">("");
+  const [jobType, setJobType] = useState<JobType | "">("");
   const [postal, setPostal] = useState("");
 
   const postalDigits = postal.replace(/[^0-9]/g, "");
-  const postalValid = postalDigits.length === 0 || postalDigits.length === 7;
-  const ready = age !== "" && sex !== "" && occupation !== "" && postalValid;
+  const postalValid = postalDigits.length === 7;
+  const ready =
+    age !== "" &&
+    sex !== "" &&
+    occupation !== "" &&
+    industry !== "" &&
+    jobType !== "" &&
+    postalValid;
 
   const begin = () => {
     if (!ready) return;
@@ -32,6 +44,8 @@ export default function SetupPage() {
         age_band: age as AgeBand,
         sex: sex as Sex,
         occupation: occupation as Occupation,
+        industry: industry as Industry,
+        job_type: jobType as JobType,
         postal_code: postalDigits || undefined,
       }),
     );
@@ -45,7 +59,7 @@ export default function SetupPage() {
     <div className="mx-auto max-w-md w-full px-4 py-12">
       <h1 className="font-data text-3xl text-ink">はじめる前に</h1>
       <p className="mt-3 text-base text-muted leading-relaxed">
-        結果を比べるために、いくつか教えてください。
+        はじめに、あなたについて教えてください。
       </p>
 
       <div className="mt-8">
@@ -101,6 +115,38 @@ export default function SetupPage() {
       </div>
 
       <div className="mt-6">
+        <label className="font-body text-base text-ink">業種</label>
+        <select
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value as Industry)}
+          className={selectCls}
+        >
+          <option value="">選択してください</option>
+          {INDUSTRIES.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-6">
+        <label className="font-body text-base text-ink">職種</label>
+        <select
+          value={jobType}
+          onChange={(e) => setJobType(e.target.value as JobType)}
+          className={selectCls}
+        >
+          <option value="">選択してください</option>
+          {JOB_TYPES.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-6">
         <label className="font-body text-base text-ink">郵便番号</label>
         <input
           type="text"
@@ -110,7 +156,7 @@ export default function SetupPage() {
           placeholder="例: 1000001（7桁）"
           className={selectCls}
         />
-        {!postalValid && (
+        {postal.trim() !== "" && !postalValid && (
           <p className="mt-1.5 text-base" style={{ color: "var(--red)" }}>
             郵便番号は7桁の数字で入力してください。
           </p>

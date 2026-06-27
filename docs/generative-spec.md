@@ -94,7 +94,12 @@ function genPatternPair(rng, length: 5|6|7, matchProb = 0.5) {
 
 ## 3. 数唱・逆唱（Digit Span） — Gsm
 
-順唱・逆唱で共通の**適応ステアケース**を使う。比較対象だけが順/逆で違う。
+順唱・逆唱で共通の**固定長**administration を使う（比較・規準化のため全員同一試行数）。
+比較対象だけが順/逆で違う。
+
+> 設計判断（2026-06-24）: 当初は適応ステアケース（2連続失敗で終了）だったが、
+> 「正誤で問題数が変わると比較・規準化が不安定／早期終了の運で過小評価」という指摘を受け、
+> **固定長（スパン3〜5を各2試行＝全員6試行）・同時提示・正答数で採点**へ変更した。
 
 ```ts
 function genDigitSeq(rng, span: number) {
@@ -118,28 +123,26 @@ function isTrivialRun(s: number[]) {                            // 連続昇降3
 }
 ```
 
-### 適応ステアケース（共通）
+### 固定長 administration（共通）
 ```ts
+const DIGIT_SPAN_PLAN = [3, 3, 4, 4, 5, 5]; // スパン3〜5を各2試行＝6試行
+
 // mode: 'forward' | 'backward'
 async function runSpan(rng, mode) {
-  let span = 3, strikes = 0, maxSpan = 0;
-  while (true) {
-    const seq = genDigitSeq(rng, span);
-    await present(seq, { perItem: 800, gap: 200 });            // 1桁800ms+間200ms
+  const plan = DIGIT_SPAN_PLAN.map((span) => genDigitSeq(rng, span));
+  for (const seq of plan) {                                    // 早期終了なし
+    await presentAll(seq, 1000 + 500 * seq.length);           // 系列全体を数秒まとめて提示
     const ans = await collectInput();                          // テンキー/キーボード
     const target = mode === 'backward' ? [...seq].reverse() : seq;
     const correct = arrEq(ans, target);
     const partial = longestCorrectPrefix(ans, target);         // 部分点
-    log({ span, sequence: seq, response: ans, correct, partial, mode });
-    if (correct) { maxSpan = span; span += 1; strikes = 0; }
-    else { strikes += 1; if (strikes >= 2) break; }            // 2連続失敗で終了（spanは上げない）
+    log({ span: seq.length, sequence: seq, response: ans, correct, partial, mode });
   }
-  return { maxSpan };
 }
 ```
-- **提示**: 1桁ずつ 800ms、間 200ms。スパン3開始、正解で+1、2連続失敗で終了。
+- **提示**: 系列全体を数秒まとめて提示（`1000+500*span` ms）→非表示→再生。スパン3〜5を各2試行、全員6試行（早期終了なし）。
 - **ログ**: `span, sequence, response, correct, partial(系列内正答数), input_rt`。
-- **集計**: `maxSpan`（順唱・逆唱を別task）。逆唱−順唱差＝操作負荷の指標。
+- **集計**: `total_correct`（0〜10, 採点指標）＋ `max_span_reached`（正答した最大スパン）。順唱・逆唱を別task。
 
 ---
 
@@ -229,7 +232,7 @@ function genMentalRotation(rng): GeneratedItem<MRParams> {
 |---|---|---|
 | 記号変換 | 30秒内正答数 | throughput（高いほど良） |
 | 一致判定 | accuracy・RT合成 | speed-accuracy |
-| 数唱/逆唱 | maxSpan（＋部分点） | span値 |
+| 数唱/逆唱 | total_correct（0〜6・固定6試行・同時提示） | 正答数 |
 | 空間スパン | maxSpan | span値 |
 | 数列完成 | 難易度重み付き正答率 | 能力推定値 |
 | 心的回転 | accuracy・RT傾き | speed-accuracy |

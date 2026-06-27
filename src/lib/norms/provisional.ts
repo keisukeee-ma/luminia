@@ -19,12 +19,18 @@ interface NormSpec {
 const NORMS: Record<string, NormSpec> = {
   // 記号変換: 30秒あたりの正答数
   Gs_coding: { refAge: 22, mean: 55, sd: 12, slopePerYear: -0.35, higherIsBetter: true },
-  // 数唱（順唱）: 最大スパン
-  Gsm_digit_forward: { refAge: 22, mean: 6.5, sd: 1.2, slopePerYear: -0.012, higherIsBetter: true },
-  // 逆唱: 最大スパン
-  Gsm_digit_backward: { refAge: 22, mean: 5.0, sd: 1.2, slopePerYear: -0.02, higherIsBetter: true },
+  // 数唱（順唱）: 固定6試行の正答数（0〜6・同時提示）
+  Gsm_digit_forward: { refAge: 22, mean: 5.5, sd: 0.8, slopePerYear: -0.02, higherIsBetter: true },
+  // 逆唱: 固定6試行の正答数（0〜6・同時提示）
+  Gsm_digit_backward: { refAge: 22, mean: 4.5, sd: 1.0, slopePerYear: -0.025, higherIsBetter: true },
   // 数列完成: 難易度重み付き正答率（0..1）
   Gf_series: { refAge: 22, mean: 0.7, sd: 0.18, slopePerYear: -0.005, higherIsBetter: true },
+  // 心的回転: 正答率（0..1）
+  Gv_rotation: { refAge: 22, mean: 0.85, sd: 0.12, slopePerYear: -0.004, higherIsBetter: true },
+  // 知識（語彙・一般知識・ことわざ）: 難易度重み付き正答率（0..1・加齢で安定〜微増）
+  Gc_knowledge: { refAge: 22, mean: 0.7, sd: 0.15, slopePerYear: 0.002, higherIsBetter: true },
+  // 単語再認: 正答数（0〜12）
+  Glr_recognition: { refAge: 22, mean: 10.5, sd: 1.5, slopePerYear: -0.04, higherIsBetter: true },
 };
 
 export interface NormPoint {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import ReadyScreen from "@/components/ReadyScreen";
+import { Bridge } from "@/games/Gf_Series";
 import { mulberry32 } from "@/lib/rng";
 import {
   genCodingKey,
@@ -12,6 +13,10 @@ import {
 } from "@/lib/generators/coding";
 import type { Trial } from "@/types/scoring";
 
+type Phase = "ready" | "practice" | "bridge" | "real";
+type Tone = "neutral" | "ok" | "ng";
+const PRACTICE_N = 3;
+
 export default function Gs_Coding({
   seed,
   onComplete,
@@ -19,58 +24,77 @@ export default function Gs_Coding({
   seed: number;
   onComplete: (trials: Trial[]) => void;
 }) {
-  const [started, setStarted] = useState(false);
+  const [phase, setPhase] = useState<Phase>("ready");
   const [key, setKey] = useState<CodingKey | null>(null);
   const [symbol, setSymbol] = useState("");
   const [remaining, setRemaining] = useState(CODING_DURATION_MS);
-  const [flash, setFlash] = useState<{ digit: number; ok: boolean } | null>(null);
+  const [flash, setFlash] = useState<{ digit: number; tone: Tone } | null>(null);
 
   const rngRef = useRef(mulberry32(seed));
+  const pracRngRef = useRef(mulberry32((seed ^ 0x4141) >>> 0));
   const trialsRef = useRef<Trial[]>([]);
   const ordinalRef = useRef(0);
+  const practiceCountRef = useRef(0);
   const shownAtRef = useRef(0);
   const endAtRef = useRef(0);
   const doneRef = useRef(false);
 
-  const start = () => {
+  const startPractice = () => {
+    const k = genCodingKey(pracRngRef.current);
+    setKey(k);
+    setSymbol(nextSymbol(pracRngRef.current, null));
+    practiceCountRef.current = 0;
+    shownAtRef.current = performance.now();
+    setPhase("practice");
+  };
+
+  const startReal = () => {
     const k = genCodingKey(rngRef.current);
     setKey(k);
     setSymbol(nextSymbol(rngRef.current, null));
+    trialsRef.current = [];
+    ordinalRef.current = 0;
+    doneRef.current = false;
     shownAtRef.current = performance.now();
     endAtRef.current = performance.now() + CODING_DURATION_MS;
-    setStarted(true);
+    setRemaining(CODING_DURATION_MS);
+    setPhase("real");
   };
 
   useEffect(() => {
-    if (!started) return;
+    if (phase !== "real") return;
     const id = setInterval(() => {
       setRemaining(Math.max(0, endAtRef.current - performance.now()));
     }, 100);
     return () => clearInterval(id);
-  }, [started]);
+  }, [phase]);
 
-  // 残り0の検知は updater 外（別 effect）で行う
   useEffect(() => {
-    if (started && remaining <= 0 && !doneRef.current) {
+    if (phase === "real" && remaining <= 0 && !doneRef.current) {
       doneRef.current = true;
       onComplete(trialsRef.current);
     }
-  }, [started, remaining, onComplete]);
-
-  // キーボード入力（数字キー1-9）
-  useEffect(() => {
-    if (!started) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key >= "1" && e.key <= "9") press(Number(e.key));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [started, symbol, key]);
+  }, [phase, remaining, onComplete]);
 
   const press = (digit: number) => {
-    if (!key || doneRef.current) return;
+    if (!key) return;
     const correct = key[symbol] === digit;
+
+    if (phase === "practice") {
+      setFlash({ digit, tone: correct ? "ok" : "ng" });
+      window.setTimeout(() => setFlash(null), 300);
+      practiceCountRef.current += 1;
+      if (practiceCountRef.current >= PRACTICE_N) {
+        window.setTimeout(() => setPhase("bridge"), 380);
+        return;
+      }
+      setSymbol(nextSymbol(pracRngRef.current, symbol));
+      shownAtRef.current = performance.now();
+      return;
+    }
+
+    if (phase !== "real" || doneRef.current) return;
+    const rt = Math.round(performance.now() - shownAtRef.current);
     trialsRef.current.push({
       task_id: "Gs_coding",
       ability: "Gs",
@@ -78,16 +102,33 @@ export default function Gs_Coding({
       params: { symbol, expected: key[symbol] },
       response: digit,
       correct,
-      rt_ms: Math.round(performance.now() - shownAtRef.current),
+      rt_ms: rt,
       input_method: "mouse",
+      extra: {
+        events: [{ t: rt, type: "key", value: digit }],
+        n_edits: 0,
+        time_to_first_ms: rt,
+        inter_response_ms: [],
+      },
     });
-    setFlash({ digit, ok: correct });
-    setTimeout(() => setFlash(null), 140);
+    setFlash({ digit, tone: "neutral" });
+    window.setTimeout(() => setFlash(null), 120);
     setSymbol(nextSymbol(rngRef.current, symbol));
     shownAtRef.current = performance.now();
   };
 
-  if (!started) {
+  // キーボード入力（数字キー1-9）
+  useEffect(() => {
+    if (phase !== "practice" && phase !== "real") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key >= "1" && e.key <= "9") press(Number(e.key));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, symbol, key]);
+
+  if (phase === "ready") {
     return (
       <ReadyScreen
         title="記号変換"
@@ -105,22 +146,30 @@ export default function Gs_Coding({
             （マウスでもキーボードの数字でも入力できます）
           </p>
         }
-        onStart={start}
+        onStart={startReal}
+        onPractice={startPractice}
       />
     );
   }
+  if (phase === "bridge") return <Bridge onStart={startReal} />;
 
   const secLeft = Math.ceil(remaining / 1000);
   const timerPct = (remaining / CODING_DURATION_MS) * 100;
+  const toneColor = (t: Tone) =>
+    t === "ok" ? "var(--green)" : t === "ng" ? "var(--red)" : "var(--brass)";
 
   return (
     <div className="flex-1 flex flex-col items-center px-4 py-6">
-      <div className="w-full max-w-md h-1.5 bg-border rounded-full overflow-hidden">
-        <div
-          className="h-full transition-all"
-          style={{ width: `${timerPct}%`, background: secLeft <= 8 ? "var(--red)" : "var(--blue)" }}
-        />
-      </div>
+      {phase === "real" ? (
+        <div className="w-full max-w-md h-1.5 bg-border rounded-full overflow-hidden">
+          <div
+            className="h-full transition-all"
+            style={{ width: `${timerPct}%`, background: secLeft <= 8 ? "var(--red)" : "var(--blue)" }}
+          />
+        </div>
+      ) : (
+        <p className="text-base text-muted">れんしゅう</p>
+      )}
 
       <div className="mt-5 grid grid-cols-3 gap-2 w-fit mx-auto">
         {CODING_SYMBOLS.map((s) => (
@@ -149,7 +198,7 @@ export default function Gs_Coding({
               className="w-16 h-16 rounded-lg border text-2xl font-data transition-colors"
               style={
                 f
-                  ? { background: flash!.ok ? "var(--green)" : "var(--red)", color: "#fff", borderColor: "transparent" }
+                  ? { background: toneColor(flash!.tone), color: "#fff", borderColor: "transparent" }
                   : { background: "var(--paper)", borderColor: "var(--border)", color: "var(--ink)" }
               }
             >

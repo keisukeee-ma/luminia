@@ -41,7 +41,14 @@ function useCountUp(target: number | null, durationMs: number, startDelay = 0) {
 }
 
 export default function ResultsView({ scores }: { scores: ComputedScores }) {
-  const { result, abilities } = scores;
+  const result = scores?.result ?? {
+    brain_age: null,
+    brain_age_delta: null,
+    fluid_composite_z: null,
+    gc_z: null,
+    model_version: "",
+  };
+  const abilities = scores?.abilities ?? [];
   const d = deltaLabel(result.brain_age_delta);
 
   const animAge = useCountUp(result.brain_age, 1500, 250);
@@ -93,8 +100,9 @@ export default function ResultsView({ scores }: { scores: ComputedScores }) {
       </div>
 
       <p className="mt-6 text-base leading-relaxed text-muted">
-        ※ これは縦切り版の暫定推定です。脳年齢は流動系能力（処理速度・作業記憶・流動性推論）から算出しており、
-        規準値は文献ベースの暫定値（v0）です。今後データが蓄積されるほど精度が上がります。
+        ※ 脳年齢は加齢で変化しやすい流動系5能力（処理速度・作業記憶・流動性推論・視覚処理・記憶）から算出します。
+        結晶性知能は加齢で下がりにくいため、比較の基準（対照）として表示しています。
+        規準値は文献ベースの暫定値（v0）で、今後データが蓄積されるほど精度が上がります。
       </p>
     </div>
   );

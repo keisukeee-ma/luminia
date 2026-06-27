@@ -79,13 +79,26 @@ create table trials (
   correct      boolean,                -- 非採点(learn/distractor)は null
   rt_ms        int,                    -- 入力受付可能〜確定
   input_method text,
-  extra        jsonb,                  -- partial, distractor_type, 桁別rt, 系列位置 等
+  extra        jsonb,                  -- イベント単位ログ＋派生指標（下記）
   created_at   timestamptz not null default now()
 );
 create index on trials (session_id);
 create index on trials (task_id);
 create index on trials (ability);
 ```
+
+**`extra` のイベントスキーマ（2026-06-27〜・クライアントが格納）**
+```jsonc
+{
+  "events": [ { "t": 347, "type": "key|backspace|choice|submit|tap", "value": 4 } ], // 設問開始からの相対ms
+  "n_edits": 1,              // やり直し（backspace 等）回数
+  "time_to_first_ms": 500,   // 初回入力までの時間
+  "inter_response_ms": [300, 300], // 入力間隔
+  "span": 4, "partial": 3, "mode": "forward" // 課題固有（任意）
+}
+```
+クライアントの実装は `src/lib/telemetry.ts`（`createEventLog`/`deriveMetrics`）。
+端末情報は `sessions` の `device_type`/`input_method`/`viewport` に対応（`SessionState.device`）。
 
 ### task_scores（課題集計・1セッション1課題）
 ```sql
