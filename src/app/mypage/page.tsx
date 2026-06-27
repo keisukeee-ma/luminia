@@ -5,17 +5,81 @@ import Link from "next/link";
 import { loadHistory, type HistoryEntry } from "@/lib/history";
 import { STEPS } from "@/lib/session";
 import ResultsView from "@/components/ResultsView";
+import TrendChart from "@/components/TrendChart";
 import type { Trial } from "@/types/scoring";
 
 const TASK_LABEL: Record<string, string> = Object.fromEntries(
   STEPS.map((s) => [s.task_id, s.label])
 );
 
+/** 反応時間バーチャート（タスクごとの試行 RT を可視化）。 */
+function RtChart({ trials }: { trials: Trial[] }) {
+  const timed = trials.filter((t) => t.rt_ms !== null && t.rt_ms > 0);
+  if (timed.length === 0) return null;
+
+  const rts = timed.map((t) => t.rt_ms as number);
+  const maxRt = Math.max(...rts);
+  const avgRt = Math.round(rts.reduce((s, v) => s + v, 0) / rts.length);
+
+  const W = 300;
+  const H = 40;
+  const barW = Math.min(20, (W - 4) / timed.length - 2);
+  const gap = (W - 4 - timed.length * barW) / Math.max(1, timed.length - 1);
+  const avgX = (avgRt / maxRt) * H; // used for dashed line
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-muted">反応時間</span>
+        <span className="text-xs text-muted tabular-nums">平均 {avgRt} ms</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="反応時間">
+        {/* 平均 dashed 横線 */}
+        <line
+          x1="0"
+          y1={H - avgX}
+          x2={W}
+          y2={H - avgX}
+          stroke="var(--muted)"
+          strokeWidth="1"
+          strokeDasharray="3 3"
+          opacity="0.6"
+        />
+        {timed.map((t, i) => {
+          const x = 2 + i * (barW + gap);
+          const barH = ((t.rt_ms as number) / maxRt) * (H - 2);
+          const fill = t.correct === false
+            ? "var(--red)"
+            : t.correct === true
+            ? "var(--blue)"
+            : "var(--muted)";
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={H - barH}
+              width={barW}
+              height={barH}
+              rx="2"
+              fill={fill}
+              opacity="0.6"
+              aria-label={`${t.rt_ms}ms`}
+            />
+          );
+        })}
+      </svg>
+      <div className="flex justify-between text-xs text-muted mt-0.5 tabular-nums">
+        <span>速い</span>
+        <span>遅い ▶ {Math.round(maxRt)}ms</span>
+      </div>
+    </div>
+  );
+}
+
 function TrialReview({ trials }: { trials: Trial[] }) {
-  // task_id ごとにグループ化（STEPS 順）
   const byTask = new Map<string, Trial[]>();
   for (const t of trials) {
-    if (t.correct === null) continue; // 非採点（学習）はスキップ
+    if (t.correct === null) continue;
     const arr = byTask.get(t.task_id) ?? [];
     arr.push(t);
     byTask.set(t.task_id, arr);
@@ -41,6 +105,7 @@ function TrialReview({ trials }: { trials: Trial[] }) {
                   {nCorrect} / {ts.length} 正解
                 </span>
               </div>
+              {/* ○/× グリッド */}
               <div className="flex flex-wrap gap-1.5">
                 {ts.map((t, i) => (
                   <div
@@ -56,6 +121,8 @@ function TrialReview({ trials }: { trials: Trial[] }) {
                   </div>
                 ))}
               </div>
+              {/* 反応時間バー */}
+              <RtChart trials={ts} />
             </div>
           );
         })}
@@ -95,6 +162,9 @@ export default function MyPage() {
     <div className="mx-auto max-w-xl w-full px-4 py-10">
       <h1 className="font-data text-2xl text-ink">マイページ</h1>
       <p className="mt-1 text-base text-muted">これまでの計測：{history.length}件</p>
+
+      {/* 経時変化グラフ（2件以上のとき） */}
+      <TrendChart history={history} />
 
       <div className="mt-4 flex flex-col gap-2">
         {history.map((h, i) => (

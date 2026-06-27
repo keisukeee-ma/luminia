@@ -8,6 +8,7 @@ import { computeScores } from "@/lib/scoring";
 import { addHistoryEntry } from "@/lib/history";
 import { syncSession } from "@/lib/sync";
 import ResultsView from "@/components/ResultsView";
+import ShareButton from "@/components/ShareButton";
 import type { ComputedScores } from "@/types/scoring";
 
 export default function ResultsPage() {
@@ -37,7 +38,8 @@ export default function ResultsPage() {
   return (
     <div className="flex-1">
       <ResultsView scores={scores} />
-      <div className="text-center pb-12">
+      <div className="mx-auto max-w-xl px-4 pb-12 flex flex-col items-center gap-4">
+        <ShareButton scores={scores} />
         <Link href="/" className="text-base text-brass underline">
           ホームに戻る
         </Link>
