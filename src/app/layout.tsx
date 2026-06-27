@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_JP } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 
@@ -23,6 +24,11 @@ export default function RootLayout({
       <body className="font-body min-h-full flex flex-col antialiased">
         <NavBar />
         <main className="flex-1 flex flex-col">{children}</main>
+        <footer className="border-t border-border py-4 text-center text-xs text-muted">
+          <Link href="/privacy" className="underline hover:text-ink">プライバシーポリシー</Link>
+          <span className="mx-2">·</span>
+          <span>© 2026 脳年齢測定</span>
+        </footer>
       </body>
     </html>
   );

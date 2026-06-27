@@ -228,6 +228,11 @@ function AccountSection({ onHistoryMerged }: { onHistoryMerged: () => void }) {
             {sendState === "error" && (
               <p className="text-xs" style={{ color: "var(--red)" }}>{sendError}</p>
             )}
+            <p className="text-xs text-muted">
+              送信することで
+              <a href="/privacy" className="underline text-brass mx-1">プライバシーポリシー</a>
+              に同意したものとみなします。
+            </p>
           </div>
         )}
       </div>
