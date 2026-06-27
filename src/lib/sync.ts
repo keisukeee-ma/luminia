@@ -19,10 +19,14 @@ export async function syncSession(
   const sessionId = crypto.randomUUID();
   const now = new Date().toISOString();
 
+  // 認証済みなら auth.uid()、未認証なら localStorage UUID
+  const { data: { session: authSession } } = await supabase.auth.getSession();
+  const userId = authSession?.user?.id ?? (getUserId() || null);
+
   // 1. sessions
   const { error: sessErr } = await supabase.from("sessions").insert({
     id: sessionId,
-    user_id: getUserId() || null,
+    user_id: userId,
     status: "completed",
     mode: "core",
     seed: s.seed,

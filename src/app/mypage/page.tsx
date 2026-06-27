@@ -5,7 +5,8 @@ import Link from "next/link";
 import { loadHistory, type HistoryEntry } from "@/lib/history";
 import { STEPS } from "@/lib/session";
 import { getUserId, setUserId } from "@/lib/userId";
-import { fetchRemoteHistory, mergeIntoLocal } from "@/lib/remote-history";
+import { fetchRemoteHistory, fetchMyHistory, mergeIntoLocal } from "@/lib/remote-history";
+import { sendMagicLink, signOut, getAuthUser, onAuthChange, type AuthUser } from "@/lib/auth";
 import ResultsView from "@/components/ResultsView";
 import TrendChart from "@/components/TrendChart";
 import type { Trial } from "@/types/scoring";
@@ -100,19 +101,57 @@ function TrialReview({ trials }: { trials: Trial[] }) {
 }
 
 type ImportState = "idle" | "loading" | "ok" | "empty" | "error";
+type SendState = "idle" | "sending" | "sent" | "error";
 
-function MyIdCard() {
+function AccountSection({ onHistoryMerged }: { onHistoryMerged: () => void }) {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [email, setEmail] = useState("");
+  const [sendState, setSendState] = useState<SendState>("idle");
+  const [sendError, setSendError] = useState("");
+
+  // UUID フォールバック用
   const [userId, setUserIdState] = useState("");
   const [copied, setCopied] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importCode, setImportCode] = useState("");
   const [importState, setImportState] = useState<ImportState>("idle");
   const [importCount, setImportCount] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setUserIdState(getUserId());
-  }, []);
+    // 初期認証状態を取得
+    getAuthUser().then(setAuthUser);
+    // 状態変化を監視（Magic Link クリック後のセッション確立を検知）
+    const unsub = onAuthChange(async (user) => {
+      setAuthUser(user);
+      if (user) {
+        // ログイン時にリモート履歴を自動マージ
+        const remote = await fetchMyHistory();
+        if (remote && remote.length > 0) {
+          mergeIntoLocal(remote);
+          onHistoryMerged();
+        }
+      }
+    });
+    return unsub;
+  }, [onHistoryMerged]);
+
+  const handleSend = async () => {
+    if (!email.trim()) return;
+    setSendState("sending");
+    const { error } = await sendMagicLink(email.trim());
+    if (error) {
+      setSendError(error);
+      setSendState("error");
+    } else {
+      setSendState("sent");
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setAuthUser(null);
+  };
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(userId);
@@ -122,89 +161,132 @@ function MyIdCard() {
 
   const handleImport = async () => {
     const code = importCode.trim();
-    // UUID形式の簡易バリデーション
-    if (!/^[0-9a-f-]{36}$/i.test(code)) {
-      setImportState("error");
-      return;
-    }
+    if (!/^[0-9a-f-]{36}$/i.test(code)) { setImportState("error"); return; }
     setImportState("loading");
     const remote = await fetchRemoteHistory(code);
-    if (!remote) {
-      setImportState("error");
-      return;
-    }
-    if (remote.length === 0) {
-      setImportState("empty");
-      return;
-    }
+    if (!remote) { setImportState("error"); return; }
+    if (remote.length === 0) { setImportState("empty"); return; }
     const added = mergeIntoLocal(remote);
-    // 引き継いだIDを自デバイスのIDとして保存
     setUserId(code);
     setUserIdState(code);
     setImportCount(added);
     setImportState("ok");
+    onHistoryMerged();
   };
 
-  if (!userId) return null;
-
   return (
-    <div className="mt-6 bg-paper border border-border rounded-lg px-5 py-4">
-      <h2 className="font-body text-ink text-base mb-1">マイID</h2>
-      <p className="text-xs text-muted mb-3">別端末への引き継ぎや復元に使います。メモしておくと安心です。</p>
+    <div className="mt-6 flex flex-col gap-3">
+      {/* ── メール認証セクション ── */}
+      <div className="bg-paper border border-border rounded-lg px-5 py-4">
+        <h2 className="font-body text-ink text-base mb-1">アカウント連携</h2>
+        <p className="text-xs text-muted mb-3">
+          メールアドレスで連携すると、どの端末でも計測履歴を引き継げます。
+        </p>
 
-      {/* ID表示 */}
-      <div className="flex items-center gap-2">
-        <code className="flex-1 bg-background border border-border rounded px-3 py-2 text-xs text-ink font-data break-all select-all">
-          {userId}
-        </code>
-        <button
-          onClick={handleCopy}
-          className="shrink-0 px-3 py-2 rounded border text-xs font-body transition-colors"
-          style={copied
-            ? { borderColor: "var(--green)", color: "var(--green)" }
-            : { borderColor: "var(--border)", color: "var(--muted)" }}
-        >
-          {copied ? "コピー済" : "コピー"}
-        </button>
+        {authUser ? (
+          /* ログイン済み */
+          <div>
+            <p className="text-sm text-ink mb-2">
+              ログイン中：<span className="font-data">{authUser.email}</span>
+            </p>
+            <p className="text-xs text-muted mb-3">
+              今後の計測は自動的にこのアカウントに紐付けられます。
+            </p>
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-muted underline"
+            >
+              ログアウト
+            </button>
+          </div>
+        ) : sendState === "sent" ? (
+          /* 送信済み */
+          <p className="text-sm text-ink">
+            メールを送信しました。届いたリンクをクリックするとログインします。
+          </p>
+        ) : (
+          /* 未ログイン */
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="メールアドレス"
+                className="flex-1 border border-border rounded px-3 py-2 text-sm bg-background text-ink"
+              />
+              <button
+                onClick={handleSend}
+                disabled={sendState === "sending" || !email.trim()}
+                className="shrink-0 px-4 py-2 rounded-md text-sm font-body"
+                style={{ background: "var(--brass)", color: "#fff", opacity: sendState === "sending" ? 0.6 : 1 }}
+              >
+                {sendState === "sending" ? "送信中…" : "送信"}
+              </button>
+            </div>
+            {sendState === "error" && (
+              <p className="text-xs" style={{ color: "var(--red)" }}>{sendError}</p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* 引き継ぎ */}
-      <button
-        onClick={() => { setShowImport((v) => !v); setImportState("idle"); }}
-        className="mt-3 text-xs text-brass underline"
-      >
-        別端末から引き継ぐ
-      </button>
-
-      {showImport && (
-        <div className="mt-3 flex flex-col gap-2">
-          <input
-            ref={inputRef}
-            value={importCode}
-            onChange={(e) => setImportCode(e.target.value)}
-            placeholder="引き継ぎ元のマイIDを貼り付け"
-            className="w-full border border-border rounded px-3 py-2 text-xs font-data bg-background text-ink"
-          />
+      {/* ── マイID（UUIDフォールバック）セクション ── */}
+      {userId && (
+        <div className="bg-paper border border-border rounded-lg px-5 py-4">
+          <h2 className="font-body text-ink text-base mb-1">マイID（旧方式）</h2>
+          <p className="text-xs text-muted mb-3">
+            メール連携の前に取得したデータの引き継ぎに使えます。
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-background border border-border rounded px-3 py-2 text-xs text-ink font-data break-all select-all">
+              {userId}
+            </code>
+            <button
+              onClick={handleCopy}
+              className="shrink-0 px-3 py-2 rounded border text-xs font-body transition-colors"
+              style={copied
+                ? { borderColor: "var(--green)", color: "var(--green)" }
+                : { borderColor: "var(--border)", color: "var(--muted)" }}
+            >
+              {copied ? "コピー済" : "コピー"}
+            </button>
+          </div>
           <button
-            onClick={handleImport}
-            disabled={importState === "loading" || !importCode.trim()}
-            className="w-full py-2 rounded-md text-sm font-body transition-colors"
-            style={{ background: "var(--brass)", color: "#fff", opacity: importState === "loading" ? 0.6 : 1 }}
+            onClick={() => { setShowImport((v) => !v); setImportState("idle"); }}
+            className="mt-3 text-xs text-brass underline"
           >
-            {importState === "loading" ? "読み込み中…" : "引き継ぐ"}
+            別端末から引き継ぐ
           </button>
-          {importState === "ok" && (
-            <p className="text-xs text-green-600">
-              {importCount > 0 ? `${importCount}件を追加しました。ページを再読み込みしてください。` : "すでにすべてのデータが揃っています。"}
-            </p>
-          )}
-          {importState === "empty" && (
-            <p className="text-xs text-muted">このIDに紐付いた計測データが見つかりませんでした。</p>
-          )}
-          {importState === "error" && (
-            <p className="text-xs" style={{ color: "var(--red)" }}>
-              IDの形式が正しくないか、読み込みに失敗しました。
-            </p>
+          {showImport && (
+            <div className="mt-3 flex flex-col gap-2">
+              <input
+                value={importCode}
+                onChange={(e) => setImportCode(e.target.value)}
+                placeholder="引き継ぎ元のマイIDを貼り付け"
+                className="w-full border border-border rounded px-3 py-2 text-xs font-data bg-background text-ink"
+              />
+              <button
+                onClick={handleImport}
+                disabled={importState === "loading" || !importCode.trim()}
+                className="w-full py-2 rounded-md text-sm font-body"
+                style={{ background: "var(--brass)", color: "#fff", opacity: importState === "loading" ? 0.6 : 1 }}
+              >
+                {importState === "loading" ? "読み込み中…" : "引き継ぐ"}
+              </button>
+              {importState === "ok" && (
+                <p className="text-xs" style={{ color: "var(--green)" }}>
+                  {importCount > 0 ? `${importCount}件を追加しました。` : "すでに揃っています。"}
+                </p>
+              )}
+              {importState === "empty" && (
+                <p className="text-xs text-muted">データが見つかりませんでした。</p>
+              )}
+              {importState === "error" && (
+                <p className="text-xs" style={{ color: "var(--red)" }}>IDの形式が正しくないか、読み込みに失敗しました。</p>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -216,8 +298,12 @@ export default function MyPage() {
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [sel, setSel] = useState(0);
 
-  useEffect(() => {
+  const reloadHistory = () => {
     setHistory(loadHistory().filter((h) => h && h.scores && Array.isArray(h.scores.abilities)));
+  };
+
+  useEffect(() => {
+    reloadHistory();
   }, []);
 
   if (history === null) return null;
@@ -230,7 +316,7 @@ export default function MyPage() {
         <Link href="/setup" className="inline-block mt-6 bg-brass text-white rounded-md px-8 py-3 font-body">
           計測をはじめる
         </Link>
-        <MyIdCard />
+        <AccountSection onHistoryMerged={reloadHistory} />
       </div>
     );
   }
@@ -268,7 +354,7 @@ export default function MyPage() {
         {entry.trials && entry.trials.length > 0 && <TrialReview trials={entry.trials} />}
       </div>
 
-      <MyIdCard />
+      <AccountSection onHistoryMerged={reloadHistory} />
     </div>
   );
 }

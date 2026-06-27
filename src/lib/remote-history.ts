@@ -76,7 +76,20 @@ function toHistoryEntry(r: RemoteSession): HistoryEntry {
   };
 }
 
-/** 指定 user_id のリモート履歴を取得する。失敗時は null。 */
+/**
+ * ログイン済みユーザー自身の履歴を取得する（get_my_history RPC 使用）。
+ * 未認証時や失敗時は null。
+ */
+export async function fetchMyHistory(): Promise<HistoryEntry[] | null> {
+  const { data, error } = await supabase.rpc("get_my_history");
+  if (error || data === null) {
+    console.error("[remote-history] get_my_history failed", error);
+    return null;
+  }
+  return (data as RemoteSession[]).map(toHistoryEntry);
+}
+
+/** 指定 user_id のリモート履歴を取得する（UUIDフォールバック用）。失敗時は null。 */
 export async function fetchRemoteHistory(userId: string): Promise<HistoryEntry[] | null> {
   const { data, error } = await supabase.rpc("get_user_history", { p_user_id: userId });
   if (error || data === null) {
