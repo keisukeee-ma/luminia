@@ -19,7 +19,7 @@ export default function NavBar() {
             アプリについて
           </Link>
           <Link href="/dashboard" className="text-muted hover:text-ink">
-            全体と比べる
+            全国比較
           </Link>
           <Link href="/mypage" className="text-muted hover:text-ink">
             マイページ

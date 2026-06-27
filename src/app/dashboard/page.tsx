@@ -36,7 +36,7 @@ export default function DashboardPage() {
   if (!scores) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
-        <h1 className="font-data text-2xl text-ink">みんなとの比較</h1>
+        <h1 className="font-data text-2xl text-ink">全国比較</h1>
         <p className="mt-4 text-base text-muted">比較するには、まず計測してください。</p>
         <Link
           href="/setup"
@@ -55,7 +55,7 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-xl w-full px-4 py-10">
-      <h1 className="font-data text-2xl text-ink">みんなとの比較</h1>
+      <h1 className="font-data text-2xl text-ink">全国比較</h1>
       <p className="mt-2 text-base text-muted leading-relaxed">
         {hasReal
           ? `同年代（${ageBand}）${popN}人の中での、あなたの位置です。山が高いところに人が多く、ゴールドの線があなたです。`
