@@ -1,6 +1,7 @@
 "use client";
 
 import { supabase } from "./supabase";
+import { getUserId } from "./userId";
 import type { SessionState } from "./session";
 import type { ComputedScores } from "@/types/scoring";
 
@@ -21,6 +22,7 @@ export async function syncSession(
   // 1. sessions
   const { error: sessErr } = await supabase.from("sessions").insert({
     id: sessionId,
+    user_id: getUserId() || null,
     status: "completed",
     mode: "core",
     seed: s.seed,

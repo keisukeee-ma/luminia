@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { loadHistory, type HistoryEntry } from "@/lib/history";
 import { STEPS } from "@/lib/session";
+import { getUserId, setUserId } from "@/lib/userId";
+import { fetchRemoteHistory, mergeIntoLocal } from "@/lib/remote-history";
 import ResultsView from "@/components/ResultsView";
 import TrendChart from "@/components/TrendChart";
 import type { Trial } from "@/types/scoring";
@@ -12,7 +14,6 @@ const TASK_LABEL: Record<string, string> = Object.fromEntries(
   STEPS.map((s) => [s.task_id, s.label])
 );
 
-/** 反応時間バーチャート（タスクごとの試行 RT を可視化）。 */
 function RtChart({ trials }: { trials: Trial[] }) {
   const timed = trials.filter((t) => t.rt_ms !== null && t.rt_ms > 0);
   if (timed.length === 0) return null;
@@ -25,7 +26,7 @@ function RtChart({ trials }: { trials: Trial[] }) {
   const H = 40;
   const barW = Math.min(20, (W - 4) / timed.length - 2);
   const gap = (W - 4 - timed.length * barW) / Math.max(1, timed.length - 1);
-  const avgX = (avgRt / maxRt) * H; // used for dashed line
+  const avgX = (avgRt / maxRt) * H;
 
   return (
     <div className="mt-3">
@@ -34,37 +35,17 @@ function RtChart({ trials }: { trials: Trial[] }) {
         <span className="text-xs text-muted tabular-nums">平均 {avgRt} ms</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="反応時間">
-        {/* 平均 dashed 横線 */}
         <line
-          x1="0"
-          y1={H - avgX}
-          x2={W}
-          y2={H - avgX}
-          stroke="var(--muted)"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-          opacity="0.6"
+          x1="0" y1={H - avgX} x2={W} y2={H - avgX}
+          stroke="var(--muted)" strokeWidth="1" strokeDasharray="3 3" opacity="0.6"
         />
         {timed.map((t, i) => {
           const x = 2 + i * (barW + gap);
           const barH = ((t.rt_ms as number) / maxRt) * (H - 2);
-          const fill = t.correct === false
-            ? "var(--red)"
-            : t.correct === true
-            ? "var(--blue)"
-            : "var(--muted)";
+          const fill = t.correct === false ? "var(--red)" : t.correct === true ? "var(--blue)" : "var(--muted)";
           return (
-            <rect
-              key={i}
-              x={x}
-              y={H - barH}
-              width={barW}
-              height={barH}
-              rx="2"
-              fill={fill}
-              opacity="0.6"
-              aria-label={`${t.rt_ms}ms`}
-            />
+            <rect key={i} x={x} y={H - barH} width={barW} height={barH} rx="2"
+              fill={fill} opacity="0.6" aria-label={`${t.rt_ms}ms`} />
           );
         })}
       </svg>
@@ -85,7 +66,6 @@ function TrialReview({ trials }: { trials: Trial[] }) {
     byTask.set(t.task_id, arr);
   }
   const taskOrder = STEPS.map((s) => s.task_id).filter((id) => byTask.has(id));
-
   if (taskOrder.length === 0) return null;
 
   return (
@@ -98,35 +78,136 @@ function TrialReview({ trials }: { trials: Trial[] }) {
           return (
             <div key={taskId} className="bg-paper border border-border rounded-lg px-4 py-3">
               <div className="flex items-center justify-between mb-3">
-                <span className="font-body text-ink text-base">
-                  {TASK_LABEL[taskId] ?? taskId}
-                </span>
-                <span className="text-base text-muted tabular-nums">
-                  {nCorrect} / {ts.length} 正解
-                </span>
+                <span className="font-body text-ink text-base">{TASK_LABEL[taskId] ?? taskId}</span>
+                <span className="text-base text-muted tabular-nums">{nCorrect} / {ts.length} 正解</span>
               </div>
-              {/* ○/× グリッド */}
               <div className="flex flex-wrap gap-1.5">
                 {ts.map((t, i) => (
-                  <div
-                    key={i}
-                    title={t.rt_ms != null ? `${t.rt_ms}ms` : undefined}
+                  <div key={i} title={t.rt_ms != null ? `${t.rt_ms}ms` : undefined}
                     className="w-8 h-8 rounded-md flex items-center justify-center text-sm font-data"
-                    style={{
-                      background: t.correct ? "var(--green)" : "var(--red)",
-                      color: "#fff",
-                    }}
-                  >
+                    style={{ background: t.correct ? "var(--green)" : "var(--red)", color: "#fff" }}>
                     {t.correct ? "○" : "×"}
                   </div>
                 ))}
               </div>
-              {/* 反応時間バー */}
               <RtChart trials={ts} />
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+type ImportState = "idle" | "loading" | "ok" | "empty" | "error";
+
+function MyIdCard() {
+  const [userId, setUserIdState] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importCode, setImportCode] = useState("");
+  const [importState, setImportState] = useState<ImportState>("idle");
+  const [importCount, setImportCount] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setUserIdState(getUserId());
+  }, []);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(userId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleImport = async () => {
+    const code = importCode.trim();
+    // UUID形式の簡易バリデーション
+    if (!/^[0-9a-f-]{36}$/i.test(code)) {
+      setImportState("error");
+      return;
+    }
+    setImportState("loading");
+    const remote = await fetchRemoteHistory(code);
+    if (!remote) {
+      setImportState("error");
+      return;
+    }
+    if (remote.length === 0) {
+      setImportState("empty");
+      return;
+    }
+    const added = mergeIntoLocal(remote);
+    // 引き継いだIDを自デバイスのIDとして保存
+    setUserId(code);
+    setUserIdState(code);
+    setImportCount(added);
+    setImportState("ok");
+  };
+
+  if (!userId) return null;
+
+  return (
+    <div className="mt-6 bg-paper border border-border rounded-lg px-5 py-4">
+      <h2 className="font-body text-ink text-base mb-1">マイID</h2>
+      <p className="text-xs text-muted mb-3">別端末への引き継ぎや復元に使います。メモしておくと安心です。</p>
+
+      {/* ID表示 */}
+      <div className="flex items-center gap-2">
+        <code className="flex-1 bg-background border border-border rounded px-3 py-2 text-xs text-ink font-data break-all select-all">
+          {userId}
+        </code>
+        <button
+          onClick={handleCopy}
+          className="shrink-0 px-3 py-2 rounded border text-xs font-body transition-colors"
+          style={copied
+            ? { borderColor: "var(--green)", color: "var(--green)" }
+            : { borderColor: "var(--border)", color: "var(--muted)" }}
+        >
+          {copied ? "コピー済" : "コピー"}
+        </button>
+      </div>
+
+      {/* 引き継ぎ */}
+      <button
+        onClick={() => { setShowImport((v) => !v); setImportState("idle"); }}
+        className="mt-3 text-xs text-brass underline"
+      >
+        別端末から引き継ぐ
+      </button>
+
+      {showImport && (
+        <div className="mt-3 flex flex-col gap-2">
+          <input
+            ref={inputRef}
+            value={importCode}
+            onChange={(e) => setImportCode(e.target.value)}
+            placeholder="引き継ぎ元のマイIDを貼り付け"
+            className="w-full border border-border rounded px-3 py-2 text-xs font-data bg-background text-ink"
+          />
+          <button
+            onClick={handleImport}
+            disabled={importState === "loading" || !importCode.trim()}
+            className="w-full py-2 rounded-md text-sm font-body transition-colors"
+            style={{ background: "var(--brass)", color: "#fff", opacity: importState === "loading" ? 0.6 : 1 }}
+          >
+            {importState === "loading" ? "読み込み中…" : "引き継ぐ"}
+          </button>
+          {importState === "ok" && (
+            <p className="text-xs text-green-600">
+              {importCount > 0 ? `${importCount}件を追加しました。ページを再読み込みしてください。` : "すでにすべてのデータが揃っています。"}
+            </p>
+          )}
+          {importState === "empty" && (
+            <p className="text-xs text-muted">このIDに紐付いた計測データが見つかりませんでした。</p>
+          )}
+          {importState === "error" && (
+            <p className="text-xs" style={{ color: "var(--red)" }}>
+              IDの形式が正しくないか、読み込みに失敗しました。
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -146,12 +227,10 @@ export default function MyPage() {
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="font-data text-2xl text-ink">マイページ</h1>
         <p className="mt-4 text-base text-muted">まだ計測結果がありません。</p>
-        <Link
-          href="/setup"
-          className="inline-block mt-6 bg-brass text-white rounded-md px-8 py-3 font-body"
-        >
+        <Link href="/setup" className="inline-block mt-6 bg-brass text-white rounded-md px-8 py-3 font-body">
           計測をはじめる
         </Link>
+        <MyIdCard />
       </div>
     );
   }
@@ -163,43 +242,33 @@ export default function MyPage() {
       <h1 className="font-data text-2xl text-ink">マイページ</h1>
       <p className="mt-1 text-base text-muted">これまでの計測：{history.length}件</p>
 
-      {/* 経時変化グラフ（2件以上のとき） */}
       <TrendChart history={history} />
 
       <div className="mt-4 flex flex-col gap-2">
         {history.map((h, i) => (
-          <button
-            key={h.id}
-            onClick={() => setSel(i)}
+          <button key={h.id} onClick={() => setSel(i)}
             className="flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors"
-            style={
-              i === sel
-                ? { borderColor: "var(--brass)", background: "var(--paper)" }
-                : { borderColor: "var(--border)" }
-            }
+            style={i === sel
+              ? { borderColor: "var(--brass)", background: "var(--paper)" }
+              : { borderColor: "var(--border)" }}
           >
             <span className="text-base text-ink">
               {new Date(h.at).toLocaleString("ja-JP", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
+                year: "numeric", month: "short", day: "numeric",
+                hour: "2-digit", minute: "2-digit",
               })}
             </span>
-            <span className="font-data text-ink">
-              脳年齢 {h.scores.result.brain_age ?? "—"} 歳
-            </span>
+            <span className="font-data text-ink">脳年齢 {h.scores.result.brain_age ?? "—"} 歳</span>
           </button>
         ))}
       </div>
 
       <div className="mt-4 border-t border-border">
         <ResultsView key={entry.id} scores={entry.scores} />
-        {entry.trials && entry.trials.length > 0 && (
-          <TrialReview trials={entry.trials} />
-        )}
+        {entry.trials && entry.trials.length > 0 && <TrialReview trials={entry.trials} />}
       </div>
+
+      <MyIdCard />
     </div>
   );
 }
