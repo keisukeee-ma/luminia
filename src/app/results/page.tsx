@@ -6,6 +6,7 @@ import Link from "next/link";
 import { loadSession, clearSession } from "@/lib/session";
 import { computeScores } from "@/lib/scoring";
 import { addHistoryEntry } from "@/lib/history";
+import { syncSession } from "@/lib/sync";
 import ResultsView from "@/components/ResultsView";
 import type { ComputedScores } from "@/types/scoring";
 
@@ -25,6 +26,7 @@ export default function ResultsPage() {
     const computed = computeScores(s);
     if (computed.tasks.length > 0) {
       addHistoryEntry({ profile: s.profile, scores: computed });
+      syncSession(s, computed).catch((e) => console.error("[sync]", e));
     }
     clearSession();
     setScores(computed);
