@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import LuminiaLogo from "@/components/LuminiaLogo";
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -11,8 +12,9 @@ export default function NavBar() {
   return (
     <header className="border-b border-border bg-paper">
       <nav className="mx-auto max-w-3xl px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="font-data text-base text-ink">
-          脳年齢測定
+        <Link href="/" className="flex items-center gap-2">
+          <LuminiaLogo size={22} />
+          <span className="font-data text-base text-ink">Luminia</span>
         </Link>
         <div className="flex items-center gap-3 text-base">
           <Link href="/about" className="text-muted hover:text-ink">

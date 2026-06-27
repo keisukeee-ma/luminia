@@ -4,10 +4,10 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "脳年齢測定 — CHC理論で測る認知能力";
 
-const TITLE = "脳年齢測定";
+const TITLE = "Luminia";
 const SUBTITLE = "CHC理論で測る認知能力";
 const TAGLINE = "同年代と比べた偏差値と脳年齢の目安がわかる";
-const DOMAIN = "brain-three-gamma.vercel.app";
+const DOMAIN = "luminia.vercel.app";
 
 /**
  * Google Fonts から必要な文字だけのサブセット（TTF）を取得する。

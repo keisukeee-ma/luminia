@@ -14,10 +14,10 @@ const noto = Noto_Sans_JP({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "脳年齢測定 — CHC理論で測る認知能力",
+  title: "Luminia — CHC理論で測る認知能力",
   description: SITE_DESCRIPTION,
   openGraph: {
-    title: "脳年齢測定 — CHC理論で測る認知能力",
+    title: "Luminia — CHC理論で測る認知能力",
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     siteName: SITE_NAME,
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "脳年齢測定 — CHC理論で測る認知能力",
+    title: "Luminia — CHC理論で測る認知能力",
     description: SITE_DESCRIPTION,
   },
 };
@@ -42,7 +42,7 @@ export default function RootLayout({
         <footer className="border-t border-border py-4 text-center text-xs text-muted">
           <Link href="/privacy" className="underline hover:text-ink">プライバシーポリシー</Link>
           <span className="mx-2">·</span>
-          <span>© 2026 脳年齢測定</span>
+          <span>© 2026 Luminia</span>
         </footer>
       </body>
     </html>

@@ -7,12 +7,12 @@ export default function PrivacyPage() {
       <section className="mb-8">
         <h2 className="font-body text-lg text-ink mb-3">1. 事業者</h2>
         <p className="text-base text-muted leading-relaxed">
-          脳年齢測定（以下「当サービス」）は、個人情報保護法その他の関連法令を遵守し、
+          Luminia（以下「当サービス」）は、個人情報保護法その他の関連法令を遵守し、
           利用者の個人情報を適切に取り扱います。
         </p>
         <dl className="mt-3 text-base text-muted leading-relaxed">
           <dt className="font-body text-ink mt-2">サービス名</dt>
-          <dd>脳年齢測定</dd>
+          <dd>Luminia</dd>
           <dt className="font-body text-ink mt-2">お問い合わせ先</dt>
           <dd>ykkm2160m@gmail.com</dd>
         </dl>
