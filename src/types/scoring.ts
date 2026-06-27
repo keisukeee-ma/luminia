@@ -33,6 +33,7 @@ export interface AbilityScore {
   z_overall: number;
   t_overall: number;
   norm_version: string;
+  notMeasured?: boolean; // 本番で未回答のため算出不能
 }
 
 /** セッション結果（脳年齢）。 */

@@ -43,6 +43,18 @@ export default function AbilityMeter({
     };
   }, [targetPct, t, delay]);
 
+  if (score.notMeasured) {
+    return (
+      <div className="py-3.5">
+        <div className="flex items-baseline justify-between mb-2">
+          <span className="font-body text-ink text-base">{ABILITY_LABEL[score.ability]}</span>
+          <span className="text-base text-muted">測定不能</span>
+        </div>
+        <div className="relative h-3 bg-border rounded-full opacity-30" />
+      </div>
+    );
+  }
+
   return (
     <div className="py-3.5">
       <div className="flex items-baseline justify-between mb-2">

@@ -1,11 +1,12 @@
 import type { Profile } from "@/types/domain";
-import type { ComputedScores } from "@/types/scoring";
+import type { ComputedScores, Trial } from "@/types/scoring";
 
 export interface HistoryEntry {
   id: string;
   at: number;
   profile: Profile;
   scores: ComputedScores;
+  trials?: Trial[];
 }
 
 const KEY = "brain_history";

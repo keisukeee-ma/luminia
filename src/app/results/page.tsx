@@ -25,7 +25,7 @@ export default function ResultsPage() {
     }
     const computed = computeScores(s);
     if (computed.tasks.length > 0) {
-      addHistoryEntry({ profile: s.profile, scores: computed });
+      addHistoryEntry({ profile: s.profile, scores: computed, trials: s.trials });
       syncSession(s, computed).catch((e) => console.error("[sync]", e));
     }
     clearSession();

@@ -3,14 +3,72 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { loadHistory, type HistoryEntry } from "@/lib/history";
+import { STEPS } from "@/lib/session";
 import ResultsView from "@/components/ResultsView";
+import type { Trial } from "@/types/scoring";
+
+const TASK_LABEL: Record<string, string> = Object.fromEntries(
+  STEPS.map((s) => [s.task_id, s.label])
+);
+
+function TrialReview({ trials }: { trials: Trial[] }) {
+  // task_id ごとにグループ化（STEPS 順）
+  const byTask = new Map<string, Trial[]>();
+  for (const t of trials) {
+    if (t.correct === null) continue; // 非採点（学習）はスキップ
+    const arr = byTask.get(t.task_id) ?? [];
+    arr.push(t);
+    byTask.set(t.task_id, arr);
+  }
+  const taskOrder = STEPS.map((s) => s.task_id).filter((id) => byTask.has(id));
+
+  if (taskOrder.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <h2 className="font-body text-ink text-lg mb-4">回答の振り返り</h2>
+      <div className="flex flex-col gap-4">
+        {taskOrder.map((taskId) => {
+          const ts = byTask.get(taskId)!;
+          const nCorrect = ts.filter((t) => t.correct).length;
+          return (
+            <div key={taskId} className="bg-paper border border-border rounded-lg px-4 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-body text-ink text-base">
+                  {TASK_LABEL[taskId] ?? taskId}
+                </span>
+                <span className="text-base text-muted tabular-nums">
+                  {nCorrect} / {ts.length} 正解
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {ts.map((t, i) => (
+                  <div
+                    key={i}
+                    title={t.rt_ms != null ? `${t.rt_ms}ms` : undefined}
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-sm font-data"
+                    style={{
+                      background: t.correct ? "var(--green)" : "var(--red)",
+                      color: "#fff",
+                    }}
+                  >
+                    {t.correct ? "○" : "×"}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function MyPage() {
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [sel, setSel] = useState(0);
 
   useEffect(() => {
-    // 旧形式・壊れたエントリを除外して安全に表示する
     setHistory(loadHistory().filter((h) => h && h.scores && Array.isArray(h.scores.abilities)));
   }, []);
 
@@ -68,6 +126,9 @@ export default function MyPage() {
 
       <div className="mt-4 border-t border-border">
         <ResultsView key={entry.id} scores={entry.scores} />
+        {entry.trials && entry.trials.length > 0 && (
+          <TrialReview trials={entry.trials} />
+        )}
       </div>
     </div>
   );
