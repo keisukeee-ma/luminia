@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ComputedScores } from "@/types/scoring";
 import { ABILITY_LABEL } from "@/types/domain";
+import { SITE_URL } from "@/lib/site";
 
 function buildShareText(scores: ComputedScores): string {
   const age = scores.result.brain_age;
@@ -23,7 +24,7 @@ function buildShareText(scores: ComputedScores): string {
     }
   }
 
-  lines.push("", "https://brain-three-gamma.vercel.app");
+  lines.push("", SITE_URL);
   return lines.join("\n");
 }
 

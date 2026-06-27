@@ -3,6 +3,7 @@ import { Noto_Sans_JP } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 const noto = Noto_Sans_JP({
   weight: ["400", "500", "700"],
@@ -12,8 +13,22 @@ const noto = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "脳年齢測定 — CHC",
-  description: "CHC理論にもとづいて認知能力を測り、脳年齢の偏差値を出します。",
+  metadataBase: new URL(SITE_URL),
+  title: "脳年齢測定 — CHC理論で測る認知能力",
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: "脳年齢測定 — CHC理論で測る認知能力",
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "脳年齢測定 — CHC理論で測る認知能力",
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
